@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Configuración del sistema de memoria del proyecto. Fuente de verdad declarativa que los agentes leen en boot para decidir qué proveedor de navegación de código usar.",
+  "codeGraphProvider": "codebase-memory-mcp",
+  "providers": {
+    "codebase-memory-mcp": {
+      "type": "mcp",
+      "skill": "codebase-memory-mcp",
+      "default": true,
+      "notes": "Proveedor por defecto. Servidor MCP ya instalado. Tools: search_graph, search_code, trace_path, get_code_snippet, query_graph, get_architecture, index_repository, index_status, detect_changes. Ver skill codebase-memory-mcp para el mapa función→tool."
+    },
+    "codegraph": {
+      "type": "cli",
+      "skill": "codegraph-architecture-agent",
+      "default": false,
+      "command": "pnpm dlx @colbymchenry/codegraph",
+      "notes": "Proveedor fallback (CLI). Usar solo si codeGraphProvider se cambia a 'codegraph'. Ver skill codegraph-architecture-agent."
+    }
+  }
+}

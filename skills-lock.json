@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "csharp-developer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/csharp-developer/SKILL.md",
+      "computedHash": "42e372314889f097ba72053461500ace703cbccaa7fa71a00aae541fcbd65293"
+    }
+  }
+}
