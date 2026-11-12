@@ -30,8 +30,10 @@ Regla dura: las dependencias apuntan siempre hacia dentro. Detalle en `docs/arqu
 
 ## Agentes y skills (Claude)
 
-- Agentes: `.claude/agents/` (`architecture-memory`, `cache-gate`, `request-gate`, `compliance-gate`).
-- Skills: `.claude/skills/`.
+- Agentes: `.claude/agents/` (`architecture-memory`, `cache-gate`, `request-gate`, `compliance-gate`, `code-review`, `spec-generator`, `spec-implementer`).
+- Skills: `.claude/skills/` (incluye `sonar-cleanup`, que se apoya en `.github/agents/sonar-cleanup.agent.md`).
+- Specs (SDD): `.github/specs/` (reglas en `_shared/`). Flujo: `spec-generator` → `spec-implementer` → `code-review`.
+- Calidad: pipeline `azure-pipelines.yml` (build, tests, cobertura y SonarQube con variables genéricas) y hook `.githooks/pre-commit` (se instala con `scripts/code-review/setup-hooks.*`).
 - Configuración del proveedor de navegación de código: `.agents/config.json`.
 
 Los agentes se escribieron originalmente para Copilot. Equivalencias en Claude Code:

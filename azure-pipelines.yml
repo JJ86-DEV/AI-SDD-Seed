@@ -1,0 +1,100 @@
+# Pipeline genérico de CI: build, tests con cobertura y análisis SonarQube.
+# Antes de usarlo, definir las variables y la service connection indicadas abajo.
+#
+# Variables esperadas (Pipeline variables o variable group):
+#   Sdk                  versión del SDK de .NET (p. ej. 10.x)
+#   Build.Configuration  Release
+#   Sonar.ServiceConnection  nombre de la service connection de SonarQube
+#   Sonar.ProjectKey         clave del proyecto en SonarQube
+#   Sonar.ProjectName        nombre visible del proyecto en SonarQube
+#   NuGet.Path               ruta a NuGet.config (solo si se usan feeds privados)
+
+trigger:
+  - main
+
+name: $(Build.SourceBranchName)_$(Date:yyyyMMdd)$(rev:.r)
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UseDotNet@2
+  displayName: 'Use SDK for .NET $(Sdk)'
+  inputs:
+    version: $(Sdk)
+
+- task: SonarQubePrepare@7
+  displayName: 'Prepare analysis on SonarQube'
+  continueOnError: true
+  inputs:
+    SonarQube: '$(Sonar.ServiceConnection)'
+    scannerMode: 'dotnet'
+    projectKey: '$(Sonar.ProjectKey)'
+    projectName: '$(Sonar.ProjectName)'
+    extraProperties: |
+      sonar.cs.xunit.reportsPaths=$(Build.SourcesDirectory)/TestResults/cobertura-testresult.trx
+      sonar.cs.vstest.reportsPaths=$(Build.SourcesDirectory)/TestResults/opencover-testresult.xml
+      sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/TestResults/coverage.opencover.xml
+      sonar.exclusions=src/Infrastructure/Migrations/**/*.*,.github/**/*.*
+      sonar.coverage.exclusions=src/Api*/**/*.*,src/Domain/**/*.*,src/Infrastructure/**/*.*,tests/**/*.*
+      sonar.cpd.exclusions=src/Infrastructure/Migrations/**/*.*
+      sonar.coverage.dtdVerification=true
+      sonar.verbose=true
+
+# SonarQube Community Edition no admite análisis por rama: se elimina el parámetro.
+- script: |
+    FILTERED_PARAMS=$(echo $SONARQUBE_SCANNER_PARAMS | sed 's/"sonar.branch.name":"[^"]*"\,//g')
+    echo "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$FILTERED_PARAMS"
+  displayName: 'Filter out non-CE sonar parameters'
+
+- script: dotnet clean
+  displayName: 'dotnet clean'
+
+# Descomentar si el restore usa feeds privados de Azure Artifacts.
+# - task: NuGetAuthenticate@1
+#   displayName: 'Authenticate to Azure Artifacts feeds'
+
+- script: dotnet restore --no-cache
+  displayName: 'dotnet restore'
+
+- script: dotnet build --no-restore --configuration $(Build.Configuration)
+  displayName: 'dotnet build'
+
+- script: dotnet test "tests/UnitTests/UnitTests.csproj" --no-build --no-restore --configuration $(Build.Configuration) --logger "trx;LogFileName=$(Build.SourcesDirectory)/TestResults/cobertura-testresult.trx" /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/coverage.cobertura.xml /p:Include="[Application*]*"
+  displayName: 'dotnet cobertura test'
+
+- script: dotnet test "tests/UnitTests/UnitTests.csproj" --no-build --no-restore --configuration $(Build.Configuration) --logger "trx;LogFileName=$(Build.SourcesDirectory)/TestResults/opencover-testresult.xml" /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/coverage.opencover.xml /p:Include="[Application*]*"
+  displayName: 'dotnet opencover test'
+
+- task: PublishTestResults@2
+  displayName: 'Evaluate test results'
+  inputs:
+    testRunner: VSTest
+    testResultsFiles: '$(Build.SourcesDirectory)/TestResults/cobertura-testresult.trx'
+    failTaskOnFailedTests: true
+
+- task: PublishCodeCoverageResults@2
+  displayName: 'Publish code coverage results'
+  inputs:
+    summaryFileLocation: '$(Build.SourcesDirectory)/TestResults/coverage.cobertura.xml'
+
+- task: SonarQubeAnalyze@7
+  displayName: 'SonarQube analyze'
+
+- task: SonarQubePublish@7
+  displayName: 'SonarQube publish'
+
+- task: DotNetCoreCLI@2
+  displayName: 'DotNet publish'
+  inputs:
+    command: publish
+    publishWebProjects: true
+    projects: '**/*.csproj'
+    arguments: '--no-restore --no-build --configuration $(Build.Configuration) --output $(Build.ArtifactStagingDirectory)'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish artifact'
+  inputs:
+    ArtifactName: 'drop'
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    publishLocation: Container

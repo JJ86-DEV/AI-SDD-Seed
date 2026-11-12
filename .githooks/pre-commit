@@ -1,0 +1,100 @@
+#!/bin/sh
+###############################################################################
+# Pre-commit hook — AI Code Review (.NET 10 Backend)
+#
+# Instalado via: git config core.hooksPath .githooks
+# Shebang #!/bin/sh requerido por el cliente Git de Visual Studio (libgit2).
+#
+# El Git embebido de VS no incluye bash. Se detecta bash con 5 métodos:
+#   1. bash en PATH (Git Bash nativo, terminales configuradas)
+#   2. Mismo directorio que sh — con .exe para Windows
+#   3. Derivación desde git --exec-path — con .exe para Windows
+#   4. %LOCALAPPDATA%/Programs/Git — sin cygpath (usa tr)
+#   5. Rutas fijas comunes en Windows (fallback absoluto)
+#
+# Para deshabilitar puntualmente:
+#   AI_CODE_REVIEW_DISABLED=true git commit -m "msg"
+###############################################################################
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$HOOK_DIR")"
+REVIEW_SCRIPT="$PROJECT_ROOT/scripts/ai-review.sh"
+
+if [ ! -f "$REVIEW_SCRIPT" ]; then
+  echo "❌ No se encontró scripts/ai-review.sh en $PROJECT_ROOT"
+  exit 1
+fi
+
+find_bash() {
+  # 1. bash en PATH
+  command -v bash 2>/dev/null && return 0
+
+  # 2. Mismo directorio que sh — incluye .exe (Windows)
+  _sh_dir="$(dirname "$(command -v sh 2>/dev/null)")"
+  if [ -f "$_sh_dir/bash" ];     then echo "$_sh_dir/bash";     return 0; fi
+  if [ -f "$_sh_dir/bash.exe" ]; then echo "$_sh_dir/bash.exe"; return 0; fi
+
+  # 3. Derivar raíz desde git --exec-path — incluye .exe (Windows)
+  _exec="$(git --exec-path 2>/dev/null)"
+  if [ -n "$_exec" ]; then
+    _root="${_exec%/mingw64/libexec/git-core}"
+    _root="${_root%/libexec/git-core}"
+    for _p in \
+      "$_root/usr/bin/bash"     "$_root/usr/bin/bash.exe" \
+      "$_root/bin/bash"         "$_root/bin/bash.exe" \
+      "$_root/mingw64/bin/bash" "$_root/mingw64/bin/bash.exe"; do
+      if [ -f "$_p" ]; then echo "$_p"; return 0; fi
+    done
+  fi
+
+  # 4. Git en %LOCALAPPDATA% — sin cygpath, normaliza backslashes con tr
+  if [ -n "$LOCALAPPDATA" ]; then
+    _local_norm=$(printf '%s' "$LOCALAPPDATA" | tr '\\' '/')
+    for _p in \
+      "$_local_norm/Programs/Git/bin/bash.exe" \
+      "$_local_norm/Programs/Git/usr/bin/bash.exe" \
+      "$_local_norm/Programs/Git/mingw64/bin/bash.exe"; do
+      if [ -f "$_p" ]; then echo "$_p"; return 0; fi
+    done
+  fi
+
+  # 5. Rutas fijas comunes en Windows (fallback absoluto)
+  for _p in \
+    "C:/Program Files/Git/bin/bash.exe" \
+    "C:/Program Files/Git/usr/bin/bash.exe" \
+    "C:/Program Files (x86)/Git/bin/bash.exe"; do
+    if [ -f "$_p" ]; then echo "$_p"; return 0; fi
+  done
+
+  return 1
+}
+
+BASH_EXE="$(find_bash)"
+
+if [ -z "$BASH_EXE" ]; then
+  echo "❌ bash no disponible en este entorno Git." >&2
+  echo "   Ejecuta la revision manualmente: bash scripts/ai-review.sh" >&2
+  echo "" >&2
+  echo "   Diagnostico:" >&2
+  echo "     git --exec-path: $(git --exec-path 2>/dev/null)" >&2
+  echo "     LOCALAPPDATA:    $LOCALAPPDATA" >&2
+  exit 1
+fi
+
+LOG_FILE="$PROJECT_ROOT/.git/ai-review-last.log"
+
+# Ejecuta la revisión y captura toda la salida en el log.
+# No usar exec: necesitamos código después de que el script termine.
+"$BASH_EXE" "$REVIEW_SCRIPT" > "$LOG_FILE" 2>&1
+REVIEW_EXIT=$?
+
+# Reenviar log completo a stderr.
+# VS 2026 muestra el stderr del hook en el diálogo de error cuando exit != 0.
+cat "$LOG_FILE" >&2
+
+echo "" >&2
+echo "════════════════════════════════════════════════════" >&2
+echo "📋 AI Review — informe completo: .git/ai-review-last.log" >&2
+echo "════════════════════════════════════════════════════" >&2
+
+exit $REVIEW_EXIT

@@ -30,7 +30,10 @@ Regla dura: las dependencias apuntan siempre hacia dentro. Detalle en `docs/arqu
 
 ## Agentes y skills (Copilot)
 
-- Agentes: `.github/agents/` (`archiecture-memory`, `cache-gate`, `request-gate`, `compliance-gate`).
+- Agentes: `.github/agents/` (`archiecture-memory`, `cache-gate`, `request-gate`, `compliance-gate`, `code-review`, `spec-generator`, `spec-implementer`, `sonar-cleanup`).
+- Specs (SDD): `.github/specs/` (reglas en `_shared/`). Flujo: `spec-generator` → `spec-implementer` → `code-review`.
+- Calidad: pipeline `azure-pipelines.yml` (build, tests, cobertura y SonarQube con variables genéricas) y hook `.githooks/pre-commit` (se instala con `scripts/code-review/setup-hooks.*`).
+- Compilar y testear: `.github/instructions/build-and-test.instructions.md`.
 - Skills: `.agents/skills/`.
 - Configuración del proveedor de navegación de código: `.agents/config.json`.
 
