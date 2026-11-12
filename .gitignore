@@ -344,3 +344,8 @@ result/
 /src/Application/Resources/ApplicationMessages.cs
 /tests/UnitTests/Services/AuthServiceTests.cs
 /tests/UnitTests/Services/AuthServiceTests.cs
+
+# SQLite local (demo)
+*.db
+*.db-shm
+*.db-wal
