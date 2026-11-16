@@ -1,4 +1,7 @@
+using Application.Interfaces;
 using Infrastructure.Contexts;
+using Infrastructure.Repositories;
+using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,9 @@ public static class ServiceCollectionExtensions
             ?? throw new InvalidOperationException("Falta ConnectionStrings:Default en la configuración.");
 
         services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(connectionString));
+
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ICategoryDeletionGuard, NoBooksCategoryDeletionGuard>();
 
         return services;
     }

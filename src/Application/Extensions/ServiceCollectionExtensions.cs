@@ -1,3 +1,5 @@
+using Application.Interfaces;
+using Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Extensions;
@@ -14,6 +16,7 @@ public static class ServiceCollectionExtensions
     /// <returns>La misma colección, para encadenar.</returns>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<ICategoryService, CategoryService>();
         return services;
     }
 }
